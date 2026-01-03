@@ -1,0 +1,335 @@
+import os
+import threading
+import time
+import requests
+from tkinter import messagebox
+import subprocess
+import customtkinter as ctk
+from PIL import Image, ImageTk
+import pygame
+import urllib.request
+
+# --- Theme and Configuration ---
+# Using a clear, high-contrast color scheme.
+dark_theme = {
+    "primary": "#1E1E1E",
+    "secondary": "#2D2D2D",
+    "accent": "#5A5FE6", # A slightly softer, more accessible purple
+    "danger": "#FF6B6B",
+    "text": "#F0F0F0", # Brighter text for better contrast
+    "highlight": "#3A3A3A",
+    "online": "#2ECC71", # A standard green for online status
+    "offline": "#E74C3C" # A standard red for offline status
+}
+
+# --- Asset Management ---
+# We will store icons in an 'assets' folder. This function helps create it
+# and provides instructions if icons are missing.
+ASSETS_DIR = "assets"
+ICON_URLS = {
+    "mic.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/av/mic/materialicons/48dp/1x/baseline_mic_white_48dp.png",
+    "mic_user.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/social/person/materialicons/48dp/1x/baseline_person_white_48dp.png",
+    "play.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/av/play_arrow/materialicons/48dp/1x/baseline_play_arrow_white_48dp.png",
+    "quote.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/editor/format_quote/materialicons/48dp/1x/baseline_format_quote_white_48dp.png",
+    "music.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/image/music_note/materialicons/48dp/1x/baseline_music_note_white_48dp.png",
+    "stop.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/av/stop/materialicons/48dp/1x/baseline_stop_white_48dp.png",
+    "help.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/help_outline/materialicons/48dp/1x/baseline_help_outline_white_48dp.png",
+    "run.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/rocket_launch/materialicons/48dp/1x/baseline_rocket_launch_white_48dp.png",
+    "wifi_on.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/notification/wifi/materialicons/48dp/1x/baseline_wifi_white_48dp.png",
+    "wifi_off.png": "https://raw.githubusercontent.com/google/material-design-icons/master/png/notification/wifi_off/materialicons/48dp/1x/baseline_wifi_off_white_48dp.png"
+}
+
+def setup_assets():
+    """Checks for an assets folder, creates it, and downloads icons if missing."""
+    if not os.path.exists(ASSETS_DIR):
+        print(f"Creating '{ASSETS_DIR}' directory...")
+        os.makedirs(ASSETS_DIR)
+
+    for name, url in ICON_URLS.items():
+        path = os.path.join(ASSETS_DIR, name)
+        if not os.path.exists(path):
+            try:
+                print(f"Downloading {name}...")
+                urllib.request.urlretrieve(url, path)
+            except Exception as e:
+                print(f"Could not download {name}. Please download it manually from {url} and place it in the '{ASSETS_DIR}' folder. Error: {e}")
+
+
+def load_icon(filename, size=(24, 24)):
+    """Loads an icon from the assets folder, returning a placeholder if not found."""
+    path = os.path.join(ASSETS_DIR, filename)
+    if os.path.exists(path):
+        try:
+            return ctk.CTkImage(Image.open(path), size=size)
+        except Exception as e:
+            print(f"Error loading image {filename}: {e}")
+    # Return a transparent placeholder if image fails to load
+    return ctk.CTkImage(Image.new('RGBA', size, (0, 0, 0, 0)), size=size)
+
+
+# --- Backend Functions (Unchanged) ---
+def check_internet_connection():
+    try:
+        requests.get("https://www.google.com", timeout=5)
+        return True
+    except requests.ConnectionError:
+        return False
+
+def run_script1():
+    subprocess.run(["python", "permaudio.py"])
+
+def run_script2():
+    subprocess.run(["python", "tempaudio.py"])
+
+def run_script(mode):
+    filepath = "KaiGo_ONLINE.py" if mode == "ONLINE" else "KaiGo_OFFLINE.py"
+    os.system(f'python "{filepath}"')
+
+def play_audio():
+    file_path = "Output/output.wav"
+    if os.path.exists(file_path):
+        os.system(f'start "" "{file_path}"')
+    else:
+        messagebox.showerror("Error", "No output audio found!")
+
+def play_preset_quote():
+    preset_path = "Output/preset.wav"
+    if os.path.exists(preset_path):
+        os.system(f'start "" "{preset_path}"')
+    else:
+        messagebox.showerror("Error", "Preset audio file not found!")
+
+# --- Music Player Class (Unchanged) ---
+class MusicPlayer:
+    def __init__(self):
+        self.thread = None
+        self.stop_event = threading.Event()
+        pygame.mixer.init()
+
+    def play_ambient_music(self):
+        sound_path = "Misc/ambient_music.wav"
+        if os.path.exists(sound_path):
+            pygame.mixer.music.load(sound_path)
+            pygame.mixer.music.play(-1)
+            while not self.stop_event.is_set():
+                time.sleep(0.1)
+            pygame.mixer.music.stop()
+        else:
+            print("Ambient music file not found!")
+
+    def start(self):
+        if self.thread and self.thread.is_alive():
+            self.stop()
+        self.stop_event.clear()
+        self.thread = threading.Thread(target=self.play_ambient_music, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.stop_event.set()
+        pygame.mixer.music.stop()
+
+# --- Main Application ---
+class KaigoAIApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        
+        # --- Pre-flight checks ---
+        setup_assets()
+
+        self.title("Kaigo AI")
+        self.geometry("1000x750")
+        self.minsize(800, 600)
+        self.music_player = MusicPlayer()
+        self.music_playing = False
+
+        ctk.set_appearance_mode("dark")
+
+        # --- Load all icons at startup ---
+        self.icons = {
+            "mic": load_icon("mic.png"),
+            "mic_user": load_icon("mic_user.png"),
+            "play": load_icon("play.png"),
+            "quote": load_icon("quote.png"),
+            "music": load_icon("music.png"),
+            "stop": load_icon("stop.png"),
+            "help": load_icon("help.png"),
+            "run": load_icon("run.png"),
+            "wifi_on": load_icon("wifi_on.png"),
+            "wifi_off": load_icon("wifi_off.png")
+        }
+
+        self.main_frame = ctk.CTkFrame(self, fg_color=dark_theme["primary"])
+        self.main_frame.pack(fill="both", expand=True)
+
+        self.setup_ui()
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.update_connection_status()
+
+    def setup_ui(self):
+        # --- Header ---
+        header_frame = ctk.CTkFrame(self.main_frame, fg_color=dark_theme["secondary"], corner_radius=0)
+        header_frame.pack(fill="x", side="top", ipady=10)
+
+        title_label = ctk.CTkLabel(header_frame, text="Kaigo AI", text_color=dark_theme["accent"], font=ctk.CTkFont(size=28, weight="bold", family="Roboto"))
+        title_label.pack(side="left", padx=20)
+
+        # Connection Status with Icon
+        self.connection_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        self.connection_frame.pack(side="right", padx=20)
+        self.connection_icon = ctk.CTkLabel(self.connection_frame, text="")
+        self.connection_icon.pack(side="left", padx=5)
+        self.connection_label = ctk.CTkLabel(self.connection_frame, text="Checking...", text_color=dark_theme["text"], font=ctk.CTkFont(size=14))
+        self.connection_label.pack(side="left")
+
+        # --- Main Content Area ---
+        content_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        content_frame.grid_columnconfigure((0, 1), weight=1)
+        content_frame.grid_rowconfigure(0, weight=1)
+
+        # --- Left Column: Recording ---
+        left_frame = ctk.CTkFrame(content_frame, fg_color=dark_theme["secondary"], corner_radius=12)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_frame.pack_propagate(False)
+
+        ctk.CTkLabel(left_frame, text="Record Audio", text_color=dark_theme["accent"], font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(20, 15))
+
+        self.create_button(left_frame, "Record Caregiver Voice", self.icons["mic"], run_script1)
+        self.create_button(left_frame, "Record User Thoughts", self.icons["mic_user"], run_script2)
+
+        # --- Right Column: Playback ---
+        right_frame = ctk.CTkFrame(content_frame, fg_color=dark_theme["secondary"], corner_radius=12)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        right_frame.pack_propagate(False)
+
+        ctk.CTkLabel(right_frame, text="Playback Audio", text_color=dark_theme["accent"], font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(20, 15))
+
+        self.create_button(right_frame, "Play Caregiver Response", self.icons["play"], play_audio)
+        self.create_button(right_frame, "Play Preset Quotes", self.icons["quote"], play_preset_quote)
+        self.music_button = self.create_button(right_frame, "Play Ambient Music", self.icons["music"], self.toggle_music)
+        
+        # --- Bottom Row: Actions & Instructions ---
+        bottom_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        bottom_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        bottom_frame.grid_columnconfigure((0, 1), weight=1)
+
+        self.help_button = self.create_action_button(bottom_frame, "Instructions", self.icons["help"], self.toggle_instructions)
+        self.help_button.grid(row=0, column=0, padx=5, sticky="ew")
+        
+        self.run_button = self.create_action_button(bottom_frame, "Run Kaigo AI", self.icons["run"], self.run_mode_selection, color=dark_theme["accent"])
+        self.run_button.grid(row=0, column=1, padx=5, sticky="ew")
+
+        # --- Instructions Panel (Initially Hidden) ---
+        self.instructions_frame = ctk.CTkFrame(content_frame, fg_color=dark_theme["secondary"], corner_radius=12)
+        self.setup_instructions_panel()
+        # It will be displayed via .grid() when the help button is clicked
+
+    def create_button(self, parent, text, icon, command):
+        """Helper function to create consistent buttons."""
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            image=icon,
+            command=command,
+            compound="left",
+            anchor="w",
+            fg_color=dark_theme["highlight"],
+            hover_color=dark_theme["accent"],
+            text_color=dark_theme["text"],
+            font=ctk.CTkFont(size=16, weight="bold"),
+            height=60,
+            corner_radius=8,
+            border_spacing=15
+        )
+        btn.pack(fill="x", padx=20, pady=12)
+        return btn
+
+    def create_action_button(self, parent, text, icon, command, color=dark_theme["highlight"]):
+        """Helper function for the main action buttons at the bottom."""
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            image=icon,
+            command=command,
+            fg_color=color,
+            hover_color=dark_theme["danger"],
+            text_color=dark_theme["text"],
+            font=ctk.CTkFont(size=16, weight="bold"),
+            height=60,
+            corner_radius=8
+        )
+        return btn
+
+    def setup_instructions_panel(self):
+        """Creates the content of the toggleable instructions panel."""
+        self.instructions_frame.grid_columnconfigure(1, weight=1)
+        
+        title = ctk.CTkLabel(self.instructions_frame, text="How to Use Kaigo AI", text_color=dark_theme["accent"], font=ctk.CTkFont(size=18, weight="bold"))
+        title.grid(row=0, column=0, columnspan=2, pady=(20, 15), padx=20)
+
+        steps = [
+            ("1. Record Caregiver", "First, record the caregiver's voice."),
+            ("2. Record User", "Then, record the user's thoughts or feelings."),
+            ("3. Wait", "Processing can take a few minutes. Play ambient music to relax."),
+            ("4. Run AI", "Click 'Run Kaigo AI' to start the analysis."),
+            ("5. Playback", "Listen to the generated response or preset quotes.")
+        ]
+
+        icons = [self.icons["mic"], self.icons["mic_user"], self.icons["music"], self.icons["run"], self.icons["play"]]
+
+        for i, ((step_title, step_desc), icon) in enumerate(zip(steps, icons)):
+            icon_label = ctk.CTkLabel(self.instructions_frame, image=icon, text="")
+            icon_label.grid(row=i + 1, column=0, padx=(20, 10), pady=10, sticky="n")
+            
+            text_frame = ctk.CTkFrame(self.instructions_frame, fg_color="transparent")
+            text_frame.grid(row=i + 1, column=1, padx=(0, 20), pady=10, sticky="w")
+            
+            ctk.CTkLabel(text_frame, text=step_title, font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+            ctk.CTkLabel(text_frame, text=step_desc, wraplength=350, justify="left").pack(anchor="w")
+
+    def toggle_instructions(self):
+        """Shows or hides the instructions panel."""
+        if self.instructions_frame.winfo_viewable():
+            self.instructions_frame.grid_forget()
+        else:
+            # Place it over the recording and playback frames
+            self.instructions_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+            self.instructions_frame.tkraise() # Bring to front
+
+    def update_connection_status(self):
+        """Periodically checks internet connection and updates UI."""
+        is_online = check_internet_connection()
+        if is_online:
+            self.connection_label.configure(text="Online", text_color=dark_theme["online"])
+            self.connection_icon.configure(image=self.icons["wifi_on"])
+        else:
+            self.connection_label.configure(text="Offline", text_color=dark_theme["offline"])
+            self.connection_icon.configure(image=self.icons["wifi_off"])
+        
+        self.after(10000, self.update_connection_status) # Check every 10 seconds
+
+    def run_mode_selection(self):
+        online = check_internet_connection()
+        mode = "Online" if online else "Offline"
+        messagebox.showinfo("Starting", f"Running in {mode} mode...")
+        threading.Thread(target=run_script, args=(mode.upper(),), daemon=True).start()
+
+    def toggle_music(self):
+        if not self.music_playing:
+            self.music_player.start()
+            self.music_playing = True
+            self.music_button.configure(text="Stop Ambient Music", image=self.icons["stop"])
+        else:
+            self.music_player.stop()
+            self.music_playing = False
+            self.music_button.configure(text="Play Ambient Music", image=self.icons["music"])
+
+    def on_close(self):
+        self.music_player.stop()
+        self.destroy()
+
+if __name__ == "__main__":
+    pygame.init() 
+    app = KaigoAIApp()
+    app.mainloop()
+    pygame.quit()

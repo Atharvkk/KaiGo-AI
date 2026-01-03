@@ -1,0 +1,23 @@
+#Benchmarks
+
+#1: Lenovo ThinkPad T490:
+#Specs: CPU: i-5 8350U 
+#       GPU: Integrated UHD 620 Graphics, no dGPU
+#       RAM: 40GB DDR4 3200mHZ
+#       Storage: 256GB SSD
+#Runtime: 444.22497s for OFFLINE, 239.77943s for ONLINE, TTS-1 comp time: 16.58421s (no GPU), TTS-2: Comp time: 184.89521s(No GPU)
+
+
+#2: Lenovo Legion Pro 5i '23:
+#Specs: CPU: i-9 13900HX  +OpenVINO +{DLB}
+#       GPU: Integrated UHD Graphics, RTX 4070 Laptop
+#       RAM: 32GB DDR5 5600mHZ
+#       Storage: 1TB 7000 SSD
+#Runtime: 61.49302s for OFFLINE, 39.39163s for ONLINE, TTS-1 comp time: 4.58421s (i-9 13900hX), TTS-2: Comp time: 21.43138s(i-9 13900hX)
+
+#3:  OMEN MAX 16 '25:
+#Specs: CPU: Core Ultra 7 255hX +OpenVINO + {DLB}
+#       GPU: RTX 5060 Laptop
+#       RAM: 24GB DDR5 4800mHZ
+#       Storage: 1TB 7000 SSD
+#Runtime: 65.33182s for OFFLINE, 42,94341s for ONLINE, TTS-1 comp time: 5.31667s (Core Ultra 7 255hX), TTS-2: Comp time: 23.94310s (Core Ultra 7 255hX)
